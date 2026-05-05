@@ -1,0 +1,20 @@
+{
+  "name": "adocs",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "adocs": "./index.ts"
+  },
+  "scripts": {
+    "start": "bun run ./index.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "fast-glob": "^3.3.3"
+  }
+}
