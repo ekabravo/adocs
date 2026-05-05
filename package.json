@@ -1,5 +1,5 @@
 {
-  "name": "adocs",
+  "name": "adocs-cli",
   "version": "0.1.0",
   "description": "CLI for inspecting and locally overriding repository instruction files",
   "type": "module",

@@ -5,13 +5,13 @@
 Run without installing:
 
 ```bash
-npx <published-package-name>
+npx adocs-cli
 ```
 
 Install globally:
 
 ```bash
-npm install -g <published-package-name>
+npm install -g adocs-cli
 ```
 
 Then use:
@@ -26,8 +26,6 @@ adocs restore
 ## Overview
 
 `adocs` is a CLI for managing repository-local `AGENTS.md` and `CLAUDE.md` files.
-
-In the examples below, replace `<published-package-name>` with the name you publish to npm.
 
 It was built for a simple reason: many repositories add too many AI instruction files, often spread across nested directories, and they end up adding noise instead of clarity. When you work locally, you may want a short, consistent set of instructions that matches how you prefer to work, without editing the repository for everyone else.
 
@@ -48,10 +46,10 @@ By default, mutating commands operate only on Git-tracked instruction files so t
 ### Show instruction files
 
 ```bash
-npx <published-package-name>
-npx <published-package-name> ./repo
-npx <published-package-name> --json
-npx <published-package-name> --excluded
+npx adocs-cli
+npx adocs-cli ./repo
+npx adocs-cli --json
+npx adocs-cli --excluded
 ```
 
 Shows all discovered `AGENTS.md` and `CLAUDE.md` files under the target directory as a pruned tree. Excluded directories such as `node_modules` are hidden unless `--excluded` is passed.
@@ -59,9 +57,9 @@ Shows all discovered `AGENTS.md` and `CLAUDE.md` files under the target director
 ### Apply a local override
 
 ```bash
-npx <published-package-name> override --source ~/docs/AGENTS.md
-npx <published-package-name> override --source ./AGENTS.local.md ./repo
-npx <published-package-name> override --source ./AGENTS.local.md --excluded
+npx adocs-cli override --source ~/docs/AGENTS.md
+npx adocs-cli override --source ./AGENTS.local.md ./repo
+npx adocs-cli override --source ./AGENTS.local.md --excluded
 ```
 
 This command:
@@ -75,8 +73,8 @@ This command:
 ### Restore tracked files
 
 ```bash
-npx <published-package-name> restore
-npx <published-package-name> restore ./repo
+npx adocs-cli restore
+npx adocs-cli restore ./repo
 ```
 
 This clears `skip-worktree`, restores the tracked files from `HEAD`, and removes the temporary root `AGENTS.md` if it was created only for the local override.
