@@ -1,0 +1,3 @@
+- Use `bun` for local development commands.
+- Run tests with `bun test`.
+- Verify package with `npm pack --dry-run`.

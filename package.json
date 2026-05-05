@@ -1,17 +1,30 @@
 {
   "name": "adocs",
-  "module": "index.ts",
+  "version": "0.1.0",
+  "description": "CLI for inspecting and locally overriding repository instruction files",
   "type": "module",
-  "private": true,
+  "main": "./dist/index.cjs",
   "bin": {
-    "adocs": "./index.ts"
+    "adocs": "./dist/index.cjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "scripts": {
-    "start": "bun run ./index.ts",
+    "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && esbuild index.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/index.cjs",
+    "dev": "bun run ./index.ts",
+    "prepack": "npm run build",
     "test": "bun test"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/node": "^25.6.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "commander": "^14.0.3",

@@ -12,7 +12,7 @@ export function isInstructionFilePath(filePath: string): boolean {
   return INSTRUCTION_FILES.includes(path.basename(filePath) as InstructionFileName);
 }
 
-export function hasExcludedDirectory(filePath: string, excludedDirectories = [...DEFAULT_EXCLUDED_DIRECTORIES]): boolean {
+export function hasExcludedDirectory(filePath: string, excludedDirectories: readonly string[] = DEFAULT_EXCLUDED_DIRECTORIES): boolean {
   const normalizedPath = filePath.split(path.sep).join("/");
   const segments = normalizedPath.split("/");
   return segments.some((segment) => excludedDirectories.includes(segment));

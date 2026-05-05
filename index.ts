@@ -1,5 +1,8 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
 import { main } from "./src/cli";
 
-await main(process.argv);
+main(process.argv).catch((error) => {
+  process.stderr.write(`${(error as Error).message}\n`);
+  process.exitCode = 1;
+});

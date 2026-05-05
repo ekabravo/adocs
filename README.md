@@ -2,30 +2,32 @@
 
 ## Quick Start
 
-Install dependencies:
+Run without installing:
 
 ```bash
-bun install
+npx <published-package-name>
 ```
 
-Run locally:
+Install globally:
 
 ```bash
-bun run ./index.ts
+npm install -g <published-package-name>
 ```
 
-Common commands:
+Then use:
 
 ```bash
-bun run ./index.ts
-bun run ./index.ts ./repo
-bun run ./index.ts override --source ~/docs/AGENTS.md
-bun run ./index.ts restore
+adocs
+adocs ./repo
+adocs override --source ~/docs/AGENTS.md
+adocs restore
 ```
 
 ## Overview
 
 `adocs` is a CLI for managing repository-local `AGENTS.md` and `CLAUDE.md` files.
+
+In the examples below, replace `<published-package-name>` with the name you publish to npm.
 
 It was built for a simple reason: many repositories add too many AI instruction files, often spread across nested directories, and they end up adding noise instead of clarity. When you work locally, you may want a short, consistent set of instructions that matches how you prefer to work, without editing the repository for everyone else.
 
@@ -46,10 +48,10 @@ By default, mutating commands operate only on Git-tracked instruction files so t
 ### Show instruction files
 
 ```bash
-bun run ./index.ts
-bun run ./index.ts ./repo
-bun run ./index.ts --json
-bun run ./index.ts --excluded
+npx <published-package-name>
+npx <published-package-name> ./repo
+npx <published-package-name> --json
+npx <published-package-name> --excluded
 ```
 
 Shows all discovered `AGENTS.md` and `CLAUDE.md` files under the target directory as a pruned tree. Excluded directories such as `node_modules` are hidden unless `--excluded` is passed.
@@ -57,9 +59,9 @@ Shows all discovered `AGENTS.md` and `CLAUDE.md` files under the target director
 ### Apply a local override
 
 ```bash
-bun run ./index.ts override --source ~/docs/AGENTS.md
-bun run ./index.ts override --source ./AGENTS.local.md ./repo
-bun run ./index.ts override --source ./AGENTS.local.md --excluded
+npx <published-package-name> override --source ~/docs/AGENTS.md
+npx <published-package-name> override --source ./AGENTS.local.md ./repo
+npx <published-package-name> override --source ./AGENTS.local.md --excluded
 ```
 
 This command:
@@ -73,8 +75,28 @@ This command:
 ### Restore tracked files
 
 ```bash
-bun run ./index.ts restore
-bun run ./index.ts restore ./repo
+npx <published-package-name> restore
+npx <published-package-name> restore ./repo
 ```
 
 This clears `skip-worktree`, restores the tracked files from `HEAD`, and removes the temporary root `AGENTS.md` if it was created only for the local override.
+
+## Local Development
+
+Install dependencies:
+
+```bash
+bun install
+```
+
+Run the local source tree:
+
+```bash
+bun run ./index.ts
+```
+
+Run tests:
+
+```bash
+bun test
+```
