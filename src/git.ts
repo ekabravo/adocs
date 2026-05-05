@@ -1,11 +1,14 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { INSTRUCTION_FILES } from "./constants";
 import { isInstructionFilePath, hasExcludedDirectory } from "./discovery";
 
 type GitOptions = {
   cwd: string;
 };
+
+const TRACKED_INSTRUCTION_PATHSPECS = INSTRUCTION_FILES.flatMap((name) => [`:(glob)${name}`, `:(glob)**/${name}`]);
 
 function runGit(args: string[], options: GitOptions): string {
   return execFileSync("git", args, {
@@ -45,7 +48,7 @@ export function getScopePath(repositoryRoot: string, root: string): string {
 }
 
 export function listTrackedInstructionFiles(repositoryRoot: string, scopePath = ".", includeExcluded = true): string[] {
-  const output = runGitRaw(["ls-files", "-z"], { cwd: repositoryRoot });
+  const output = runGitRaw(["ls-files", "-z", "--full-name", "--", ...TRACKED_INSTRUCTION_PATHSPECS], { cwd: repositoryRoot });
 
   return output
     .split("\0")

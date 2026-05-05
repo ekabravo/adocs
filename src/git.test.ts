@@ -15,6 +15,15 @@ function runGit(cwd: string, args: string[]): string {
   }).trim();
 }
 
+function runGitWithInput(cwd: string, args: string[], input: string): string {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    input,
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+}
+
 async function makeRepository(): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "adocs-git-"));
   tempRoots.push(root);
@@ -61,5 +70,18 @@ describe("git helpers", () => {
     expect(getTrackedRootInstructionNames(files, ".")).toEqual(["AGENTS.md"]);
     expect(getTrackedRootInstructionNames(files, "packages")).toEqual([]);
     expect(getScopePath("/repo", "/repo/packages/web")).toBe("packages/web");
+  });
+
+  test("ignores large tracked non-instruction output when listing instruction files", async () => {
+    const root = await makeRepository();
+    const blobId = runGitWithInput(root, ["hash-object", "-w", "--stdin"], "tracked\n");
+    const bulkEntries = Array.from({ length: 12000 }, (_, index) => {
+      const name = `bulk/${String(index).padStart(5, "0")}/${"x".repeat(120)}.txt`;
+      return `100644 ${blobId}\t${name}\n`;
+    }).join("");
+
+    runGitWithInput(root, ["update-index", "--add", "--index-info"], bulkEntries);
+
+    expect(listTrackedInstructionFiles(root, ".", false)).toEqual(["AGENTS.md", "packages/web/CLAUDE.md"]);
   });
 });
