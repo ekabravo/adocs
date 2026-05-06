@@ -42,7 +42,7 @@ export async function main(argv: string[]): Promise<void> {
     .command("override")
     .description("Apply a local override to tracked instruction files.")
     .argument("[root]", "Directory to target", ".")
-    .requiredOption("--source <path>", "File whose contents will be copied into the target root")
+    .requiredOption("--source <path>", "Directory whose AGENTS.md, .claude, and .codex will be copied into the target root")
     .option("--excluded", "Include tracked targets inside excluded directories")
     .action(async (...args: unknown[]) => {
       const rootArg = args[0] as string;

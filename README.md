@@ -19,7 +19,7 @@ Then use:
 ```bash
 adocs
 adocs ./repo
-adocs override --source ~/docs/AGENTS.md
+adocs override --source ~/docs/agent-context
 adocs restore
 ```
 
@@ -37,7 +37,7 @@ It was built for a simple reason: many repositories add too many AI instruction 
 
 1. Find instruction files and show them as a pruned tree.
 2. Remove tracked instruction files locally and mark them with Git `skip-worktree`.
-3. Write your local override as root `AGENTS.md`, then restore the tracked files later when needed.
+3. Copy your local override directory into the target root, then restore the tracked files later when needed.
 
 By default, mutating commands operate only on Git-tracked instruction files so the original state can be restored safely.
 
@@ -57,18 +57,23 @@ Shows all discovered `AGENTS.md` and `CLAUDE.md` files under the target director
 ### Apply a local override
 
 ```bash
-npx adocs-cli override --source ~/docs/AGENTS.md
-npx adocs-cli override --source ./AGENTS.local.md ./repo
-npx adocs-cli override --source ./AGENTS.local.md --excluded
+npx adocs-cli override --source ~/docs/agent-context
+npx adocs-cli override --source ./agent-context ./repo
+npx adocs-cli override --source ./agent-context --excluded
 ```
 
 This command:
 
 1. Resolves the Git repository root.
 2. Finds tracked `AGENTS.md` and `CLAUDE.md` files in scope.
-3. Removes those tracked files from the working tree.
-4. Marks them with Git `skip-worktree`.
-5. Writes your local override to root `AGENTS.md`.
+3. Removes those tracked files and any tracked root `.claude` or `.codex` files from the working tree.
+4. Marks those tracked files with Git `skip-worktree`.
+5. Removes root `AGENTS.md`, `CLAUDE.md`, `.claude`, and `.codex` before applying the new override.
+6. Copies `AGENTS.md` from the source directory into both root `AGENTS.md` and root `CLAUDE.md` when present.
+7. Recursively copies source `.claude` and `.codex` directories when present.
+8. Adds the generated local artifacts to `.git/info/exclude`.
+
+The source path must be a directory. Missing `AGENTS.md`, `.claude`, or `.codex` entries are allowed and will simply be omitted from the override.
 
 ### Restore tracked files
 
@@ -77,7 +82,7 @@ npx adocs-cli restore
 npx adocs-cli restore ./repo
 ```
 
-This clears `skip-worktree`, restores the tracked files from `HEAD`, and removes the temporary root `AGENTS.md` if it was created only for the local override.
+This clears `skip-worktree`, restores tracked files from `HEAD`, removes temporary root override artifacts that were not tracked, and clears the local `.git/info/exclude` entries added by `adocs`.
 
 ## Local Development
 

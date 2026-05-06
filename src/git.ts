@@ -1,7 +1,12 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { INSTRUCTION_FILES } from "./constants";
+import {
+  INSTRUCTION_FILES,
+  LOCAL_EXCLUDE_BEGIN,
+  LOCAL_EXCLUDE_END,
+  type OverrideDirectoryName,
+} from "./constants";
 import { isInstructionFilePath, hasExcludedDirectory } from "./discovery";
 
 type GitOptions = {
@@ -38,8 +43,59 @@ function isWithinScope(filePath: string, scopePath: string): boolean {
   return filePath === scopePath || filePath.startsWith(`${scopePath}/`);
 }
 
+function listTrackedPaths(repositoryRoot: string, pathspecs: string[]): string[] {
+  if (pathspecs.length === 0) {
+    return [];
+  }
+
+  const output = runGitRaw(["ls-files", "-z", "--full-name", "--", ...pathspecs], { cwd: repositoryRoot });
+
+  return output
+    .split("\0")
+    .filter(Boolean)
+    .map(toPosixPath)
+    .sort();
+}
+
+function getOverrideDirectoryPathspec(scopePath: string, directoryName: OverrideDirectoryName): string {
+  const prefix = scopePath && scopePath !== "." ? `${scopePath}/` : "";
+  return `:(glob)${prefix}${directoryName}/**`;
+}
+
+function stripManagedExcludeBlock(contents: string): string {
+  const lines = contents.split(/\r?\n/);
+  const kept: string[] = [];
+  let insideManagedBlock = false;
+
+  for (const line of lines) {
+    if (!insideManagedBlock && line === LOCAL_EXCLUDE_BEGIN) {
+      insideManagedBlock = true;
+      continue;
+    }
+
+    if (insideManagedBlock) {
+      if (line === LOCAL_EXCLUDE_END) {
+        insideManagedBlock = false;
+      }
+      continue;
+    }
+
+    kept.push(line);
+  }
+
+  return kept.join("\n").trim();
+}
+
+function renderManagedExcludeBlock(entries: string[]): string {
+  return [LOCAL_EXCLUDE_BEGIN, ...entries, LOCAL_EXCLUDE_END].join("\n");
+}
+
 export function resolveRepositoryRoot(startPath: string): string {
   return runGit(["rev-parse", "--show-toplevel"], { cwd: startPath });
+}
+
+export function resolveGitPath(repositoryRoot: string, gitPath: string): string {
+  return path.resolve(repositoryRoot, runGit(["rev-parse", "--git-path", gitPath], { cwd: repositoryRoot }));
 }
 
 export function getScopePath(repositoryRoot: string, root: string): string {
@@ -48,16 +104,18 @@ export function getScopePath(repositoryRoot: string, root: string): string {
 }
 
 export function listTrackedInstructionFiles(repositoryRoot: string, scopePath = ".", includeExcluded = true): string[] {
-  const output = runGitRaw(["ls-files", "-z", "--full-name", "--", ...TRACKED_INSTRUCTION_PATHSPECS], { cwd: repositoryRoot });
-
-  return output
-    .split("\0")
-    .filter(Boolean)
-    .map(toPosixPath)
+  return listTrackedPaths(repositoryRoot, TRACKED_INSTRUCTION_PATHSPECS)
     .filter(isInstructionFilePath)
     .filter((filePath) => isWithinScope(filePath, scopePath))
     .filter((filePath) => includeExcluded || !hasExcludedDirectory(filePath))
-    .sort();
+}
+
+export function listTrackedOverrideDirectoryFiles(
+  repositoryRoot: string,
+  scopePath: string,
+  directoryName: OverrideDirectoryName,
+): string[] {
+  return listTrackedPaths(repositoryRoot, [getOverrideDirectoryPathspec(scopePath, directoryName)]);
 }
 
 export function getTrackedInstructionNames(filePaths: string[]): string[] {
@@ -98,8 +156,35 @@ export function restoreTrackedFiles(repositoryRoot: string, filePaths: string[])
   runGit(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...filePaths], { cwd: repositoryRoot });
 }
 
-export async function removeFiles(repositoryRoot: string, filePaths: string[]): Promise<void> {
+export async function removePaths(repositoryRoot: string, filePaths: string[]): Promise<void> {
   await Promise.all(
-    filePaths.map((filePath) => fs.rm(path.join(repositoryRoot, filePath), { force: true })),
+    filePaths.map((filePath) => fs.rm(path.join(repositoryRoot, filePath), { force: true, recursive: true })),
   );
+}
+
+export async function setManagedLocalExcludeEntries(repositoryRoot: string, entries: string[]): Promise<void> {
+  const excludePath = resolveGitPath(repositoryRoot, "info/exclude");
+  let currentContents = "";
+
+  try {
+    currentContents = await fs.readFile(excludePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  const retainedContents = stripManagedExcludeBlock(currentContents);
+  const uniqueEntries = [...new Set(entries)];
+  const managedBlock = uniqueEntries.length > 0 ? renderManagedExcludeBlock(uniqueEntries) : "";
+  const nextContents = retainedContents && managedBlock
+    ? `${retainedContents}\n\n${managedBlock}\n`
+    : retainedContents
+      ? `${retainedContents}\n`
+      : managedBlock
+        ? `${managedBlock}\n`
+        : "";
+
+  await fs.mkdir(path.dirname(excludePath), { recursive: true });
+  await fs.writeFile(excludePath, nextContents, "utf8");
 }
