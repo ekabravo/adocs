@@ -5,8 +5,8 @@ import {
   INSTRUCTION_FILES,
   LOCAL_EXCLUDE_BEGIN,
   LOCAL_EXCLUDE_END,
-  type OverrideDirectoryName,
 } from "./constants";
+import { type ManagedArtifact, scopedArtifactPath } from "./artifacts";
 import { isInstructionFilePath, hasExcludedDirectory } from "./discovery";
 
 type GitOptions = {
@@ -57,7 +57,7 @@ function listTrackedPaths(repositoryRoot: string, pathspecs: string[]): string[]
     .sort();
 }
 
-function getOverrideDirectoryPathspec(scopePath: string, directoryName: OverrideDirectoryName): string {
+function getOverrideDirectoryPathspec(scopePath: string, directoryName: string): string {
   const prefix = scopePath && scopePath !== "." ? `${scopePath}/` : "";
   return `:(glob)${prefix}${directoryName}/**`;
 }
@@ -90,8 +90,38 @@ function renderManagedExcludeBlock(entries: string[]): string {
   return [LOCAL_EXCLUDE_BEGIN, ...entries, LOCAL_EXCLUDE_END].join("\n");
 }
 
+export async function getManagedLocalExcludeEntries(repositoryRoot: string): Promise<string[]> {
+  const excludePath = resolveGitPath(repositoryRoot, "info/exclude");
+  let contents: string;
+  try {
+    contents = await fs.readFile(excludePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  const lines = contents.split(/\r?\n/);
+  const begin = lines.indexOf(LOCAL_EXCLUDE_BEGIN);
+  const end = begin === -1 ? -1 : lines.indexOf(LOCAL_EXCLUDE_END, begin + 1);
+  return begin !== -1 && end !== -1 ? lines.slice(begin + 1, end) : [];
+}
+
 export function resolveRepositoryRoot(startPath: string): string {
   return runGit(["rev-parse", "--show-toplevel"], { cwd: startPath });
+}
+
+export function assertSingleWorktree(repositoryRoot: string): void {
+  const worktreeCount = runGitRaw(["worktree", "list", "--porcelain"], { cwd: repositoryRoot })
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("worktree "))
+    .length;
+  if (worktreeCount > 1) {
+    throw new Error(
+      "Adocs override and restore are disabled while linked Git worktrees exist because .git/info/exclude is shared. Remove or prune the linked worktrees first.",
+    );
+  }
 }
 
 export function resolveGitPath(repositoryRoot: string, gitPath: string): string {
@@ -100,6 +130,9 @@ export function resolveGitPath(repositoryRoot: string, gitPath: string): string 
 
 export function getScopePath(repositoryRoot: string, root: string): string {
   const relativePath = path.relative(repositoryRoot, root);
+  if (relativePath === ".." || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+    throw new Error(`Target directory must be inside the Git repository: ${root}`);
+  }
   return toPosixPath(relativePath || ".");
 }
 
@@ -113,9 +146,69 @@ export function listTrackedInstructionFiles(repositoryRoot: string, scopePath = 
 export function listTrackedOverrideDirectoryFiles(
   repositoryRoot: string,
   scopePath: string,
-  directoryName: OverrideDirectoryName,
+  directoryName: string,
 ): string[] {
   return listTrackedPaths(repositoryRoot, [getOverrideDirectoryPathspec(scopePath, directoryName)]);
+}
+
+export function listTrackedArtifactFiles(
+  repositoryRoot: string,
+  scopePath: string,
+  artifacts: readonly ManagedArtifact[],
+): string[] {
+  const pathspecs = artifacts.map((artifact) => {
+    const artifactPath = scopedArtifactPath(scopePath, artifact.path);
+    return artifact.kind === "directory" ? `:(glob)${artifactPath}/**` : artifactPath;
+  });
+  return listTrackedPaths(repositoryRoot, pathspecs);
+}
+
+export function listTrackedFiles(repositoryRoot: string, filePaths: string[]): string[] {
+  return listTrackedPaths(repositoryRoot, filePaths.map((filePath) => `:(literal)${filePath}`));
+}
+
+export function listSkipWorktreeFiles(repositoryRoot: string, filePaths: string[]): string[] {
+  if (filePaths.length === 0) {
+    return [];
+  }
+
+  const output = runGitRaw(["ls-files", "-v", "-z", "--", ...filePaths.map((filePath) => `:(literal)${filePath}`)], {
+    cwd: repositoryRoot,
+  });
+  return output
+    .split("\0")
+    .filter((entry) => entry.slice(0, 1).toUpperCase() === "S" && entry.slice(1, 2) === " ")
+    .map((entry) => toPosixPath(entry.slice(2)))
+    .sort();
+}
+
+export function listAssumeUnchangedFiles(repositoryRoot: string, filePaths: string[]): string[] {
+  if (filePaths.length === 0) {
+    return [];
+  }
+  const output = runGitRaw(["ls-files", "-v", "-z", "--", ...filePaths.map((filePath) => `:(literal)${filePath}`)], {
+    cwd: repositoryRoot,
+  });
+  return output
+    .split("\0")
+    .filter((entry) => /^[a-z] /.test(entry))
+    .map((entry) => toPosixPath(entry.slice(2)))
+    .sort();
+}
+
+export function listModifiedFiles(repositoryRoot: string, filePaths: string[]): string[] {
+  if (filePaths.length === 0) {
+    return [];
+  }
+  const output = runGitRaw([
+    "diff",
+    "--name-only",
+    "-z",
+    "HEAD",
+    "--",
+    ...filePaths.map((filePath) => `:(literal)${filePath}`),
+  ], { cwd: repositoryRoot });
+  return output.split("\0").filter(Boolean).map(toPosixPath).sort();
 }
 
 export function getTrackedInstructionNames(filePaths: string[]): string[] {
@@ -153,7 +246,7 @@ export function restoreTrackedFiles(repositoryRoot: string, filePaths: string[])
     return;
   }
 
-  runGit(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...filePaths], { cwd: repositoryRoot });
+  runGit(["restore", "--source=HEAD", "--worktree", "--", ...filePaths], { cwd: repositoryRoot });
 }
 
 export async function removePaths(repositoryRoot: string, filePaths: string[]): Promise<void> {
