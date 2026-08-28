@@ -1,0 +1,1 @@
+Scratch note verifying attachment uploads via gh api.
