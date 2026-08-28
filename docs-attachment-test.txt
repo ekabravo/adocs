@@ -1,0 +1,1 @@
+Scratch note verifying native gh pr create --attach.
